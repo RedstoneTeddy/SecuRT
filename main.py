@@ -111,7 +111,8 @@ class SecuRT_App:
             "clear": None,
             "cls": None,
             "encode": None,
-            "decode": current_names
+            "decode": current_names,
+            "tree": None
         })
         self.session.completer = self.completer
 
@@ -181,7 +182,8 @@ class SecuRT_App:
             "clear": self.cmd_clear,
             "cls": self.cmd_clear,
             "encode": self.cmd_encode,
-            "decode": self.cmd_decode
+            "decode": self.cmd_decode,
+            "tree": self.cmd_tree
         }
 
         if cmd in commands:
@@ -242,17 +244,27 @@ class SecuRT_App:
 
     def cmd_open(self, args: List[str]) -> None:
         """Open the vault by prompting for a password and loading names."""
+        import getpass
+        
         if self.password:
             print(f"{colorama.Fore.YELLOW}Vault is already open.{colorama.Style.RESET_ALL}")
             return
-        if len(args) < 1:
-            print(f"{colorama.Fore.RED}Error: Password required. Usage: open <password>{colorama.Style.RESET_ALL}")
+        
+        # Use getpass for secure password input
+        try:
+            password = getpass.getpass("Enter vault password: ")
+        except (KeyboardInterrupt, EOFError):
+            print(f"\n{colorama.Fore.YELLOW}Password entry cancelled.{colorama.Style.RESET_ALL}")
+            return
+        
+        if not password:
+            print(f"{colorama.Fore.RED}Error: Password cannot be empty.{colorama.Style.RESET_ALL}")
             return
 
-        self.password = args[0]
+        self.password = password
         try:
             self.names = name_settings.Load_names(self.password)
-            self._update_completer()  # Update tab completion with loaded data
+            self._update_completer()
             print(f"{colorama.Fore.GREEN}Vault opened successfully with {len(self.names)} entries.{colorama.Style.RESET_ALL}")
         except Exception as e:
             self.password = ""
@@ -538,7 +550,49 @@ class SecuRT_App:
         """Display help information."""
         help_menu.cmd_help(args)
 
-
+    def cmd_tree(self, args: List[str]) -> None:
+        """Display the directory structure as a tree."""
+        if not self._require_vault_open():
+            return
+        
+        print(f"{colorama.Fore.CYAN}Vault structure:{colorama.Style.RESET_ALL}")
+        
+        def print_tree(location: str = "", prefix: str = "", is_last: bool = True):
+            """Recursively print tree structure."""
+            # Get items at this location
+            items = []
+            for entry in self.names:
+                if entry['location'] == location:
+                    items.append(entry)
+            
+            # Sort: folders first, then alphabetically
+            items.sort(key=lambda x: (not x['is_folder'], x['name']))
+            
+            for i, entry in enumerate(items):
+                is_last_item = (i == len(items) - 1)
+                connector = "└── " if is_last_item else "├── "
+                
+                if entry['is_folder']:
+                    print(f"{prefix}{connector}{colorama.Fore.YELLOW}{entry['name']}/{colorama.Style.RESET_ALL}")
+                    extension = "    " if is_last_item else "│   "
+                    print_tree(location + entry['name'] + "/", prefix + extension, is_last_item)
+                else:
+                    # Get file size
+                    encrypted_path = f"data/encrypted_{entry['file_id']}"
+                    size = ""
+                    if os.path.exists(encrypted_path):
+                        file_size = os.path.getsize(encrypted_path)
+                        if file_size < 1024:
+                            size = f" ({file_size} B)"
+                        elif file_size < 1024 * 1024:
+                            size = f" ({file_size / 1024:.1f} KB)"
+                        else:
+                            size = f" ({file_size / (1024 * 1024):.1f} MB)"
+                    print(f"{prefix}{connector}{colorama.Fore.WHITE}{entry['name']}{size}{colorama.Style.RESET_ALL}")
+        
+        print(f"{colorama.Fore.YELLOW}/{colorama.Style.RESET_ALL}")
+        print_tree("", "", True)
+        
 
 
 if __name__ == "__main__":
