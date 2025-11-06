@@ -319,6 +319,36 @@ class SecuRT_App:
                     if entry['location'].startswith(check_location):
                         print(f"{colorama.Fore.RED}Error: Cannot delete folder '{name_to_delete}' - folder is not empty.{colorama.Style.RESET_ALL}")
                         return
+            # Confirm permanent deletion with the user
+            try:
+                response = input(f"Are you sure you want to permanently delete '{name_to_delete}'? This action cannot be undone. (y/n): ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                print(f"{colorama.Fore.YELLOW}Deletion cancelled.{colorama.Style.RESET_ALL}")
+                return
+
+            # Accept 'y' or 'yes' as confirmation
+            if response not in ("y", "yes"):
+                print(f"{colorama.Fore.CYAN}Deletion cancelled.{colorama.Style.RESET_ALL}")
+                return
+
+            # If it's a file (not a folder), delete the physical encrypted file as well
+            entry = self.names[i]
+            if not entry.get('is_folder', False):
+                file_id = entry.get('file_id')
+                if file_id is not None:
+                    encrypted_path = f"data/encrypted_{file_id}"
+                    if os.path.exists(encrypted_path):
+                        try:
+                            os.remove(encrypted_path)
+                        except Exception as e:
+                            print(f"{colorama.Fore.RED}Error: Failed to remove physical file '{encrypted_path}' - {e}{colorama.Style.RESET_ALL}")
+                            print(f"{colorama.Fore.YELLOW}Deletion aborted to avoid inconsistent state.{colorama.Style.RESET_ALL}")
+                            return
+                    else:
+                        print(f"{colorama.Fore.YELLOW}Warning: Physical file '{encrypted_path}' not found. Continuing to remove entry.{colorama.Style.RESET_ALL}")
+
+            # Remove the entry from the index and save changes
             del self.names[i]
             self.current_dir = self.current_dir.replace(name_to_delete + "/", "")
             name_settings.Store_names(self.names, self.password)
