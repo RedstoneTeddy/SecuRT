@@ -4,6 +4,49 @@ class NameSettings(TypedDict):
     file_id: int
     name: str
     location: str
+    is_folder: bool
+
+def Create_new_folder(names: list[NameSettings], folder_name: str, location: str) -> None:
+    """Create a new folder entry in the names list."""
+    new_folder_id: int = Calc_new_id(names)
+    names.append({
+        "file_id": new_folder_id,
+        "name": folder_name,
+        "location": location,
+        "is_folder": True
+    })
+
+def Get_folder_files(names: list[NameSettings], location: str) -> list[str]:
+    """Returns a list of all the names in a specific location"""
+    output: list[str] = []
+    for element in names:
+        if location == element["location"]:
+            output.append(element['name'])
+    return output
+
+def Get_index(names: list[NameSettings], name: str) -> int:
+    i = -1
+    for element in names:
+        i += 1
+        if element["name"] == name:
+            return i
+    return -1
+
+
+def Rename_file(names: list[NameSettings], file_id: int, new_name: str) -> bool:
+    """Rename a file or folder in the names list by its file_id."""
+    for name in names:
+        if name['file_id'] == file_id:
+            name['name'] = new_name
+            return True
+    return False
+
+def Check_name_exists(names: list[NameSettings], name: str) -> bool:
+    """Check if a name already exists in the specified location."""
+    for entry in names:
+        if entry['name'] == name:
+            return True
+    return False
 
 
 def Calc_new_id(names: list[NameSettings]) -> int:

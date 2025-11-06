@@ -51,7 +51,8 @@ def encode_file(file_path, password, names: list[name_settings.NameSettings]):
     names.append({
         "file_id": new_file_id,
         "name": os.path.basename(file_path),
-        "location": ""
+        "location": "",
+        "is_folder": False
     })
     
     # Write encrypted file
