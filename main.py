@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from os import path as os_path
 from os import chdir as os_chdir
+import os
 directory = os_path.dirname(os_path.abspath(__file__))
 os_chdir(directory) #Small Bugfix, that in some situations, the code_path isn't correct
 
@@ -16,6 +17,8 @@ import shlex
 import help_menu
 
 import name_settings
+import encode
+import decode
 
 class SecuRT_App:
     """Main interactive SecuRT_App class."""
@@ -90,7 +93,9 @@ class SecuRT_App:
                 "rename": None,
                 "cd": None,
                 "ls": None,
-                "clear": None
+                "clear": None,
+                "encode": None,
+                "decode": None
             },
             "open": None,
             "close": None,
@@ -104,7 +109,9 @@ class SecuRT_App:
             "cd": current_names,
             "ls": None,
             "clear": None,
-            "cls": None
+            "cls": None,
+            "encode": None,
+            "decode": current_names
         })
         self.session.completer = self.completer
 
@@ -172,7 +179,9 @@ class SecuRT_App:
             "cd": self.cmd_cd,
             "ls": self.cmd_ls,
             "clear": self.cmd_clear,
-            "cls": self.cmd_clear
+            "cls": self.cmd_clear,
+            "encode": self.cmd_encode,
+            "decode": self.cmd_decode
         }
 
         if cmd in commands:
@@ -383,25 +392,142 @@ class SecuRT_App:
 
 
     def cmd_ls(self, args: List[str]) -> None:
-        """Outputs all files and folder (specialy marked) in the current directory."""
+        """Outputs all files and folder (specially marked) in the current directory."""
         if not self._require_vault_open():
             return
-        print(f"{colorama.Fore.CYAN}Contents of directory '{self.current_dir}':{colorama.Style.RESET_ALL}")
-        found = False
+        display_dir = self.current_dir or "/"
+        print(f"{colorama.Fore.CYAN}Contents of directory '{display_dir}':{colorama.Style.RESET_ALL}")
+        
+        folders = []
+        files = []
+        
         for entry in self.names:
             if entry['location'] == self.current_dir:
-                found = True
                 if entry['is_folder']:
-                    print(f"{colorama.Fore.YELLOW}[Folder] {entry['name']}/{colorama.Style.RESET_ALL}")
+                    folders.append(entry['name'])
                 else:
-                    print(f"{colorama.Fore.WHITE}         {entry['name']}{colorama.Style.RESET_ALL}")
-        if not found:
+                    # Get file size if possible
+                    encrypted_path = f"data/encrypted_{entry['file_id']}"
+                    size = ""
+                    if os.path.exists(encrypted_path):
+                        file_size = os.path.getsize(encrypted_path)
+                        if file_size < 1024:
+                            size = f"{file_size} B"
+                        elif file_size < 1024 * 1024:
+                            size = f"{file_size / 1024:.1f} KB"
+                        else:
+                            size = f"{file_size / (1024 * 1024):.1f} MB"
+                    files.append((entry['name'], size))
+        
+        if not folders and not files:
             print(f"{colorama.Fore.YELLOW}(No files or folders found in this directory){colorama.Style.RESET_ALL}")
+            return
+        
+        # Print folders first
+        for folder in sorted(folders):
+            print(f"{colorama.Fore.YELLOW}[Folder] {folder}/{colorama.Style.RESET_ALL}")
+        
+        # Then files with sizes
+        for filename, size in sorted(files):
+            size_str = f" ({size})" if size else ""
+            print(f"{colorama.Fore.WHITE}         {filename}{size_str}{colorama.Style.RESET_ALL}")
 
     def cmd_clear(self, args: List[str]) -> None:
         """Clear the terminal screen."""
         import os
         os.system('cls' if os.name == 'nt' else 'clear')
+
+    def cmd_encode(self, args: List[str]) -> None:
+        """Encode (encrypt) a file and add it to the vault."""
+        if not self._require_vault_open():
+            return
+        if len(args) < 1:
+            print(f"{colorama.Fore.RED}Error: File path required. Usage: encode <file_path>{colorama.Style.RESET_ALL}")
+            return
+        
+        file_path = args[0]
+        abs_path = os.path.abspath(file_path)
+        
+        # Check if file exists
+        if not os.path.exists(abs_path):
+            print(f"{colorama.Fore.RED}Error: File does not exist.{colorama.Style.RESET_ALL}")
+            print(f"{colorama.Fore.YELLOW}  Tried path: {abs_path}{colorama.Style.RESET_ALL}")
+            return
+        
+        # Check if file is a directory
+        if os.path.isdir(abs_path):
+            print(f"{colorama.Fore.RED}Error: Path is a directory, not a file.{colorama.Style.RESET_ALL}")
+            print(f"{colorama.Fore.YELLOW}  Path: {abs_path}{colorama.Style.RESET_ALL}")
+            print(f"{colorama.Fore.CYAN}  Hint: Only files can be encoded, not directories.{colorama.Style.RESET_ALL}")
+            return
+        
+        # Get the filename
+        filename = os.path.basename(abs_path)
+        
+        # Check if filename already exists in current directory
+        if name_settings.Check_name_exists(self.names, filename):
+            print(f"{colorama.Fore.RED}Error: A file with the name '{filename}' already exists in the current directory.{colorama.Style.RESET_ALL}")
+            return
+        
+        try:
+            # Encode the file (use absolute path)
+            encode.encode_file(abs_path, self.password, self.names, self.current_dir)
+            name_settings.Store_names(self.names, self.password)
+            self._update_completer()  # Update tab completion
+            print(f"{colorama.Fore.GREEN}File '{filename}' encoded and added to vault successfully.{colorama.Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{colorama.Fore.RED}Error: Failed to encode file - {e}{colorama.Style.RESET_ALL}")
+            print(f"{colorama.Fore.YELLOW}Your changes may not be saved. Try 'close' to save manually.{colorama.Style.RESET_ALL}")
+
+    def cmd_decode(self, args: List[str]) -> None:
+        """Decode (decrypt) a file from the vault and save it to the file system."""
+        if not self._require_vault_open():
+            return
+        if len(args) < 1:
+            print(f"{colorama.Fore.RED}Error: Vault filename required. Usage: decode <vault_filename> [output_path]{colorama.Style.RESET_ALL}")
+            return
+        
+        vault_filename = args[0]
+        
+        # If no output path specified, use current working directory with the same filename
+        if len(args) < 2:
+            output_path = os.path.join(os.getcwd(), vault_filename)
+            print(f"{colorama.Fore.CYAN}No output path specified, using: {output_path}{colorama.Style.RESET_ALL}")
+        else:
+            output_path = args[1]
+        
+        # Find the file entry in current location
+        file_entry = None
+        for entry in self.names:
+            if entry['name'] == vault_filename and entry['location'] == self.current_dir:
+                file_entry = entry
+                break
+        
+        # Check if file exists in vault at current location
+        if file_entry is None:
+            print(f"{colorama.Fore.RED}Error: File '{vault_filename}' does not exist in the current directory.{colorama.Style.RESET_ALL}")
+            return
+        
+        # Check if it's a folder
+        if file_entry['is_folder']:
+            print(f"{colorama.Fore.RED}Error: '{vault_filename}' is a folder. Only files can be decoded.{colorama.Style.RESET_ALL}")
+            return
+        
+        # Check if output path already exists
+        if os_path.exists(output_path):
+            print(f"{colorama.Fore.YELLOW}Warning: File '{output_path}' already exists.{colorama.Style.RESET_ALL}")
+            response = input("Overwrite? (y/n): ").lower()
+            if response != 'y':
+                print(f"{colorama.Fore.CYAN}Decode cancelled.{colorama.Style.RESET_ALL}")
+                return
+        
+        try:
+            # Decode the file
+            decode.decode_file(output_path, self.password, self.names, file_entry['file_id'])
+            print(f"{colorama.Fore.GREEN}File '{vault_filename}' decoded and saved to '{output_path}' successfully.{colorama.Style.RESET_ALL}")
+        except Exception as e:
+            print(f"{colorama.Fore.RED}Error: Failed to decode file - {e}{colorama.Style.RESET_ALL}")
+            print(f"{colorama.Fore.YELLOW}The file may be corrupted or the password may have changed.{colorama.Style.RESET_ALL}")
 
 
     ###################
