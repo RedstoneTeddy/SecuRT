@@ -7,11 +7,21 @@ This project provides a minimal interactive command-line application to store en
 
 Run the app:
 
-```powershell
+```bash
 python main.py
 ```
 
 Type `help` inside the app for a list of commands and `help <command>` for details.
+
+
+## Security Notice
+
+**This is a learning/demonstration project.** While it uses industry-standard encryption (Fernet/AES-128), it currently has a **critical security limitation**: it uses a fixed salt for key derivation, which weakens security. 
+
+**DO NOT use this for protecting truly sensitive data in production environments.**
+
+For production use, the salt should be randomly generated per vault and stored alongside the encrypted data.
+
 
 ## Basic usage (examples)
 - `open` — open the vault; you will be prompted for a password
@@ -24,12 +34,14 @@ Type `help` inside the app for a list of commands and `help <command>` for detai
 - `status` — show vault state and basic stats
 - `close` — save and close the vault (writes encrypted config)
 
-## Implementation notes & caveats
+## Features
 
-- Encrypted blobs are stored under the repository `data/` directory, named `encrypted_<id>`.
-- The vault index (file/folder metadata) is encrypted and saved to `data/config.dat`.
-- Large files are handled using a chunked format (`SECURET_CHUNKED:`) so the app can encrypt/decrypt in pieces and display progress.
-- Currently the prototype uses a fixed salt for key derivation in several places; this weakens security for real-world use. For production you should switch to a per-vault random salt stored alongside the encrypted config.
+- **AES-128 encryption** via Fernet (cryptography library)
+- **Virtual folder structure** - organize encrypted files in directories
+- **Interactive CLI** with tab completion
+- **Progress bars** for large file operations (>5MB)
+- **Tree view** of vault structure
+- **File metadata** with size information
 
 ## Development
 
