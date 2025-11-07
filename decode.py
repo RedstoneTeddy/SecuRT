@@ -36,19 +36,19 @@ def decode_file(output_path, password, names: list[name_settings.NameSettings], 
         show_progress = False
     
     # Progress tracking
-    def print_progress(current, total, message):
+    def print_progress(current, total):
         if show_progress and total > 0:
             percentage = int((current / total) * 100)
             bar_length = 30
             filled = int(bar_length * current / total)
             bar = '█' * filled + '░' * (bar_length - filled)
-            sys.stdout.write(f"\r{colorama.Fore.CYAN}[{bar}] {percentage}% - {message}{colorama.Style.RESET_ALL}")
+            sys.stdout.write(f"\r{colorama.Fore.CYAN}[{bar}] {percentage}%{colorama.Style.RESET_ALL}")
             sys.stdout.flush()
             if current >= total:
                 print()  # New line when complete
     
     # Step 1: Derive key
-    print_progress(0, 100, "Deriving key...")
+    print_progress(0, 100)
     salt = b'securert'  # Fixed salt (must match encode)
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -57,13 +57,13 @@ def decode_file(output_path, password, names: list[name_settings.NameSettings], 
         iterations=480000,
     )
     key = Fernet(base64.urlsafe_b64encode(kdf.derive(password.encode())))
-    print_progress(10, 100, "Key derived")
+    print_progress(10, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}Decryption key calculated successfully.{colorama.Style.RESET_ALL}")
     
     # Step 2: Read the encrypted file and process in chunks
-    print_progress(10, 100, "Reading file...")
+    print_progress(10, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}Starting decryption...{colorama.Style.RESET_ALL}")
@@ -73,7 +73,7 @@ def decode_file(output_path, password, names: list[name_settings.NameSettings], 
             # Read the metadata header
             encrypted_data = file.read()
         
-        print_progress(20, 100, "File loaded, decrypting...")
+        print_progress(20, 100)
         
         # Check if file uses chunked format (has our magic header)
         if encrypted_data.startswith(b'SECURET_CHUNKED:'):
@@ -97,13 +97,13 @@ def decode_file(output_path, password, names: list[name_settings.NameSettings], 
                 
                 # Update progress (20% to 90% for decryption)
                 progress = 20 + int((i + 1) / num_chunks * 70)
-                print_progress(progress, 100, f"Decrypting chunk {i+1}/{num_chunks}...")
+                print_progress(progress, 100)
             
             decrypted_data = b''.join(decrypted_chunks)
         else:
             # Old format - decrypt as single block
             decrypted_data = key.decrypt(encrypted_data)
-            print_progress(90, 100, "Decryption complete")
+            print_progress(90, 100)
         
         if not show_progress:
             print(f"{colorama.Fore.LIGHTGREEN_EX}File decrypted successfully.{colorama.Style.RESET_ALL}")
@@ -112,14 +112,14 @@ def decode_file(output_path, password, names: list[name_settings.NameSettings], 
         raise e
     
     # Step 3: Write output file
-    print_progress(90, 100, "Saving file...")
+    print_progress(90, 100)
     output_dir = os.path.dirname(os.path.abspath(output_path))
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
     
     with open(output_path, 'wb') as file:
         file.write(decrypted_data)
-    print_progress(100, 100, "Complete!")
+    print_progress(100, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}Decrypted file saved to: {output_path}{colorama.Style.RESET_ALL}")

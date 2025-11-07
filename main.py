@@ -317,13 +317,20 @@ class SecuRT_App:
             return
         name_to_delete = args[0]
         
-        if not name_settings.Check_name_exists(self.names, name_to_delete):
+        i: int = -1
+        for index, entry in enumerate(self.names):
+            if entry['name'] == name_to_delete and entry["location"] == self.current_dir:
+                i = index
+                break
+
+
+        if i == -1:
             print(f"{colorama.Fore.RED}Error: No folder or file with the name '{name_to_delete}' exists in the current directory.{colorama.Style.RESET_ALL}")
             return
         try:
             i: int = -1
             for index, entry in enumerate(self.names):
-                if entry['name'] == name_to_delete:
+                if entry['name'] == name_to_delete and entry["location"] == self.current_dir:
                     i = index
                     break
             if i == -1:

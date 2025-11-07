@@ -29,19 +29,19 @@ def encode_file(file_path, password, names: list[name_settings.NameSettings], lo
         print(f"{colorama.Fore.CYAN}File size: {file_size / (1024*1024):.1f} MB{colorama.Style.RESET_ALL}")
     
     # Progress tracking
-    def print_progress(current, total, message):
+    def print_progress(current, total):
         if show_progress and total > 0:
             percentage = int((current / total) * 100)
             bar_length = 30
             filled = int(bar_length * current / total)
             bar = '█' * filled + '░' * (bar_length - filled)
-            sys.stdout.write(f"\r{colorama.Fore.CYAN}[{bar}] {percentage}% - {message}{colorama.Style.RESET_ALL}")
+            sys.stdout.write(f"\r{colorama.Fore.CYAN}[{bar}] {percentage}%")
             sys.stdout.flush()
             if current >= total:
                 print()  # New line when complete
     
     # Step 1: Derive key
-    print_progress(0, 100, "Deriving key...")
+    print_progress(0, 100)
     salt = b'securert'  # Fixed salt
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -50,16 +50,16 @@ def encode_file(file_path, password, names: list[name_settings.NameSettings], lo
         iterations=480000,
     )
     key = Fernet(base64.urlsafe_b64encode(kdf.derive(password.encode())))
-    print_progress(10, 100, "Key derived")
+    print_progress(10, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}Encryption key calculated successfully.{colorama.Style.RESET_ALL}")
     
     # Step 2: Read and encrypt the file in chunks
-    print_progress(10, 100, "Reading file...")
+    print_progress(10, 100)
     with open(file_path, 'rb') as file:
         original_data = file.read()
-    print_progress(20, 100, "File loaded, encrypting...")
+    print_progress(20, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}File read successfully. Starting encryption...{colorama.Style.RESET_ALL}")
@@ -81,7 +81,7 @@ def encode_file(file_path, password, names: list[name_settings.NameSettings], lo
             
             # Update progress (20% to 90% for encryption)
             progress = 20 + int((i + 1) / num_chunks * 70)
-            print_progress(progress, 100, f"Encrypting chunk {i+1}/{num_chunks}...")
+            print_progress(progress, 100)
         
         # Combine chunks with metadata for decryption
         # Format: MAGIC(16) + NUM_CHUNKS(4) + [CHUNK_SIZE(4) + CHUNK_DATA] * N
@@ -96,13 +96,13 @@ def encode_file(file_path, password, names: list[name_settings.NameSettings], lo
     else:
         # Small file - encrypt as single block
         encrypted_data = key.encrypt(original_data)
-        print_progress(90, 100, "Encryption complete")
+        print_progress(90, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}File encrypted successfully.{colorama.Style.RESET_ALL}")
     
     # Step 3: Save to vault
-    print_progress(90, 100, "Saving to vault...")
+    print_progress(90, 100)
     data_dir = 'data'
     os.makedirs(data_dir, exist_ok=True)
     
@@ -119,7 +119,7 @@ def encode_file(file_path, password, names: list[name_settings.NameSettings], lo
     
     with open(encrypted_path, 'wb') as file:
         file.write(encrypted_data)
-    print_progress(100, 100, "Complete!")
+    print_progress(100, 100)
     
     if not show_progress:
         print(f"{colorama.Fore.LIGHTGREEN_EX}Encrypted file saved.{colorama.Style.RESET_ALL}")
